@@ -1,3 +1,4 @@
 input/
 *.hi
 *.o
+test.txt
