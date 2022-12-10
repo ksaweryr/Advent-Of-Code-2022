@@ -27,21 +27,21 @@ task1 s = task1' s 20
                 getScore :: CpuState -> Int
                 getScore (CpuState x _) = x * maxTime
 
--- not prefect but good enough to read the letters
 task2 :: [CpuState] -> [String]
 task2 s = [line s x | x <- [0..5]]
     where
         line :: [CpuState] -> Int -> String
-        line s n = bool '.' '#' <$> line' (dropWhile ((< n') . time) s) n'
+        line s n = bool '.' '#' <$> line' (dropWhile ((< n' - 1) . time) s) n'
             where
                 n' = n * 40
                 line' :: [CpuState] -> Int -> [Bool]
                 line' (c:cs) pos
                     | pos == n' + 40 = []
-                    | otherwise = ((abs ((pos `mod` 40) - (x c))) < 2) : line' cs' (pos + 1)
+                    | otherwise = (abs (pos `mod` 40 - x c) < 2) : line' cs' (pos + 1)
                     where
                         c' = head cs
-                        cs' = if (time c') > pos + 1 then c:cs else cs
+                        cs' = if time c' > pos + 1 then c:cs else cs
+                line' [] _ = error "Should never happen"
 
 capitalise :: String -> String
 capitalise "" = ""
