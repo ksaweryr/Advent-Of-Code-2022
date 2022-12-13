@@ -1,4 +1,4 @@
-{-# Language LambdaCase #-}
+{-# Language LambdaCase, ViewPatterns #-}
 import Control.Applicative
 import Control.Monad (liftM2)
 import Data.Bifunctor (bimap, first, second)
@@ -7,19 +7,17 @@ import Data.List (find, sortOn)
 import Data.Maybe (fromJust, fromMaybe)
 
 data Value = ListValue [Value] | IntValue Int
-    deriving (Show)
+
+toListValue :: Value -> Value
+toListValue lv@(ListValue _) = lv
+toListValue iv@(IntValue _)  = ListValue [iv]
 
 instance Eq Value where
-    (IntValue a) == (IntValue b)        = a == b
-    (ListValue xs) == (ListValue ys)    = (length xs == length ys) && and (zipWith (==) xs ys)
-    lv@(ListValue _) == iv@(IntValue _) = lv == ListValue [iv]
-    iv@(IntValue _) == lv@(ListValue _) = lv == ListValue [iv]
+    a == b = compare a b == EQ
 
 instance Ord Value where
-    compare (IntValue a) (IntValue b)        = compare a b
-    compare (ListValue xs) (ListValue ys)    = fromMaybe (compare (length xs) (length ys)) (find (/= EQ) $ zipWith compare xs ys)
-    compare lv@(ListValue _) iv@(IntValue _) = compare lv (ListValue [iv])
-    compare iv@(IntValue _) lv@(ListValue _) = compare (ListValue [iv]) lv
+    compare (IntValue a) (IntValue b) = compare a b
+    compare (toListValue -> ListValue xs) (toListValue -> ListValue ys) = compare xs ys
 
 newtype Parser a = Parser { runParser :: String -> Maybe (a, String) }
 
@@ -39,16 +37,13 @@ instance Alternative Parser where
 
 charP :: Char -> Parser Char
 charP c = Parser $ \case
-    y:ys -> if c == y then Just (c, ys) else Nothing
+    x:xs -> if c == x then Just (c, xs) else Nothing
     ""   -> Nothing
 
 predP :: (Char -> Bool) -> Parser Char
-predP pred = Parser f
-    where
-        f []            = Nothing
-        f (x:xs)
-            | pred x    = Just (x, xs)
-            | otherwise = Nothing
+predP pred = Parser $ \case
+    x:xs -> if pred x then Just (x, xs) else Nothing
+    ""   -> Nothing
 
 intP :: Parser Int
 intP = read <$> some (predP isDigit)
@@ -83,5 +78,5 @@ main :: IO ()
 main = do
     input <- readPairs . lines <$> getContents
     let input' = ListValue [ListValue [IntValue 2]] : ListValue [ListValue [IntValue 6]] : flattenPairs input
-    print $ sum $ map fst $ filter snd $ second ((/= GT) . uncurry compare) <$> zip [1..] input
+    print $ sum $ map fst $ filter (uncurry (<=) . snd) $ zip [1..] input
     print $ product $ map fst $ filter (fst . snd) $ zip [1..] (sortOn snd $ zip ([True, True] ++ repeat False) input')
