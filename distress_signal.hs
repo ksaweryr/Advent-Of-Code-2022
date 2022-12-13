@@ -1,5 +1,4 @@
 {-# Language LambdaCase #-}
-{-# Language ViewPatterns #-}
 import Control.Applicative
 import Control.Monad (liftM2)
 import Data.Bifunctor (bimap, first, second)
@@ -12,9 +11,9 @@ data Value = ListValue [Value] | IntValue Int
 
 instance Eq Value where
     (IntValue a) == (IntValue b)        = a == b
-    (ListValue xs) == (ListValue ys)    = (length xs == length ys) && all id (zipWith (==) xs ys)
-    lv@(ListValue _) == iv@(IntValue _) = lv == (ListValue [iv])
-    iv@(IntValue _) == lv@(ListValue _) = lv == (ListValue [iv])
+    (ListValue xs) == (ListValue ys)    = (length xs == length ys) && and (zipWith (==) xs ys)
+    lv@(ListValue _) == iv@(IntValue _) = lv == ListValue [iv]
+    iv@(IntValue _) == lv@(ListValue _) = lv == ListValue [iv]
 
 instance Ord Value where
     compare (IntValue a) (IntValue b)        = compare a b
@@ -63,18 +62,18 @@ intValueP = IntValue <$> intP
 listValueP :: Parser Value
 listValueP = charP '[' *> (ListValue <$> elements) <* charP ']'
     where
-        elements = (separatedP (charP ',') valueP) <|> pure []
+        elements = separatedP (charP ',') valueP <|> pure []
 
 valueP :: Parser Value
 valueP = listValueP <|> intValueP
 
 readPacket :: String -> Value
-readPacket = fromJust . fmap fst . runParser valueP
+readPacket = fst . fromJust . runParser valueP
 
 readPairs :: [String] -> [(Value, Value)]
 readPairs [] = []
 readPairs ("":xs) = readPairs xs
-readPairs xs = uncurry (:) (bimap ((\(x:y:[]) -> (x, y)) . fmap readPacket) readPairs $ span (not . null) xs)
+readPairs xs = uncurry (:) (bimap ((\[x,y] -> (x, y)) . fmap readPacket) readPairs $ break null xs)
 
 flattenPairs :: [(a, a)] -> [a]
 flattenPairs [] = []
@@ -84,5 +83,5 @@ main :: IO ()
 main = do
     input <- readPairs . lines <$> getContents
     let input' = ListValue [ListValue [IntValue 2]] : ListValue [ListValue [IntValue 6]] : flattenPairs input
-    print $ sum $ map fst $ filter snd $ (second $ (/= GT) . uncurry compare) <$> (zip [1..] input)
-    print $ foldl (*) 1 $ map fst $ filter (fst . snd) $ zip [1..] (sortOn snd $ zip ([True, True] ++ (repeat False)) input')
+    print $ sum $ map fst $ filter snd $ second ((/= GT) . uncurry compare) <$> zip [1..] input
+    print $ product $ map fst $ filter (fst . snd) $ zip [1..] (sortOn snd $ zip ([True, True] ++ repeat False) input')
